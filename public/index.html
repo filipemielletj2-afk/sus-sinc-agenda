@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SUS-Sinc | Sistema de Agenda e Pacientes Integrado</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col font-sans">
+
+  <!-- Header Superior -->
+  <header class="bg-gradient-to-r from-emerald-700 via-teal-700 to-cyan-800 text-white shadow-md sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4">
+      
+      <!-- Brand & Titulo -->
+      <div class="flex items-center space-x-3">
+        <div class="w-11 h-11 bg-white text-emerald-700 rounded-xl flex items-center justify-center shadow font-black text-2xl tracking-tighter">
+          SUS
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <h1 class="text-xl font-bold tracking-tight">SUS-Sinc Agenda</h1>
+            <span class="text-xs bg-emerald-500/40 text-emerald-100 border border-emerald-400/30 px-2 py-0.5 rounded-full font-medium">v1.0 Integrado</span>
+          </div>
+          <p class="text-xs text-emerald-100/90 font-light">Sincronização Automática com e-SUS PEC & SISREG • Salvamento em Tempo Real</p>
+        </div>
+      </div>
+
+      <!-- Indicador de Autosave & Status de Sincronismo -->
+      <div class="flex items-center flex-wrap gap-3">
+        <!-- Floating Autosave Status -->
+        <div id="autosave-indicator" class="hidden items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-900/60 text-emerald-200 border border-emerald-400/30 backdrop-blur-sm transition-all duration-300">
+          <i class="fa-solid fa-cloud-arrow-up animate-pulse text-emerald-400"></i>
+          <span id="autosave-text">Salvo automaticamente</span>
+        </div>
+
+        <!-- Sync Status Pill -->
+        <div id="sync-status-pill" class="flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-white/10 hover:bg-white/15 border border-white/20 transition cursor-pointer" onclick="switchTab('tab-sync')" title="Clique para ver detalhes do sincronismo">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+          <span id="sync-status-text">Auto-Sync SUS Ativo (60s)</span>
+        </div>
+
+        <!-- Botão Sincronizar Agora -->
+        <button id="btn-sync-now" onclick="triggerManualSync()" class="bg-amber-400 hover:bg-amber-300 text-slate-900 font-bold px-3.5 py-1.5 rounded-lg text-xs shadow-sm flex items-center space-x-1.5 transition transform active:scale-95">
+          <i id="btn-sync-icon" class="fa-solid fa-arrows-rotate"></i>
+          <span>Sincronizar Agora</span>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Barra de Estatísticas Rápidas (KPIs) -->
+  <div class="bg-white border-b border-slate-200 shadow-xs">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+      <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3">
+        
+        <div class="bg-slate-50 border border-slate-200/80 rounded-xl p-3 flex items-center space-x-3">
+          <div class="p-2.5 bg-blue-100 text-blue-700 rounded-lg text-lg">
+            <i class="fa-solid fa-users"></i>
+          </div>
+          <div>
+            <div class="text-xs text-slate-500 font-medium">Pacientes Salvos</div>
+            <div id="kpi-total-pacientes" class="text-lg font-bold text-slate-800">0</div>
+          </div>
+        </div>
+
+        <div class="bg-slate-50 border border-slate-200/80 rounded-xl p-3 flex items-center space-x-3">
+          <div class="p-2.5 bg-indigo-100 text-indigo-700 rounded-lg text-lg">
+            <i class="fa-regular fa-calendar-check"></i>
+          </div>
+          <div>
+            <div class="text-xs text-slate-500 font-medium">Agenda Hoje</div>
+            <div id="kpi-agendamentos-hoje" class="text-lg font-bold text-slate-800">0</div>
+          </div>
+        </div>
+
+        <div class="bg-slate-50 border border-slate-200/80 rounded-xl p-3 flex items-center space-x-3">
+          <div class="p-2.5 bg-amber-100 text-amber-700 rounded-lg text-lg">
+            <i class="fa-solid fa-clock-rotate-left"></i>
+          </div>
+          <div>
+            <div class="text-xs text-slate-500 font-medium">Aguardando</div>
+            <div id="kpi-pendentes" class="text-lg font-bold text-slate-800">0</div>
+          </div>
+        </div>
+
+        <div class="bg-slate-50 border border-slate-200/80 rounded-xl p-3 flex items-center space-x-3">
+          <div class="p-2.5 bg-emerald-100 text-emerald-700 rounded-lg text-lg">
+            <i class="fa-solid fa-circle-check"></i>
+          </div>
+          <div>
+            <div class="text-xs text-slate-500 font-medium">Atendidos Hoje</div>
+            <div id="kpi-atendidos" class="text-lg font-bold text-slate-800">0</div>
+          </div>
+        </div>
+
+        <div class="col-span-2 sm:col-span-4 lg:col-span-1 bg-slate-50 border border-slate-200/80 rounded-xl p-3 flex items-center space-x-3">
+          <div class="p-2.5 bg-teal-100 text-teal-700 rounded-lg text-lg">
+            <i class="fa-solid fa-network-wired"></i>
+          </div>
+          <div>
+            <div class="text-xs text-slate-500 font-medium">Pendentes SUS</div>
+            <div id="kpi-pendentes-sync" class="text-lg font-bold text-emerald-600">0</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Navegação de Abas -->
+  <nav class="bg-white border-b border-slate-200 sticky top-16 z-30 shadow-xs">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex space-x-1 sm:space-x-8 overflow-x-auto py-2">
+        
+        <button onclick="switchTab('tab-agenda')" id="nav-agenda" class="tab-btn active px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center space-x-2 text-emerald-700 bg-emerald-50 border-b-2 border-emerald-600 transition">
+          <i class="fa-solid fa-calendar-days"></i>
+          <span>Agenda & Consultas</span>
+        </button>
+
+        <button onclick="switchTab('tab-pacientes')" id="nav-pacientes" class="tab-btn px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center space-x-2 text-slate-600 hover:text-emerald-700 hover:bg-slate-50 transition">
+          <i class="fa-solid fa-hospital-user"></i>
+          <span>Cadastro de Pacientes</span>
+        </button>
+
+        <button onclick="switchTab('tab-sync')" id="nav-sync" class="tab-btn px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center space-x-2 text-slate-600 hover:text-emerald-700 hover:bg-slate-50 transition">
+          <i class="fa-solid fa-rotate"></i>
+          <span>Central de Sincronismo SUS</span>
+          <span id="badge-sync-count" class="hidden text-xs bg-amber-500 text-white rounded-full px-1.5 py-0.2 font-bold">0</span>
+        </button>
+
+        <button onclick="switchTab('tab-relatorios')" id="nav-relatorios" class="tab-btn px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center space-x-2 text-slate-600 hover:text-emerald-700 hover:bg-slate-50 transition">
+          <i class="fa-solid fa-file-export"></i>
+          <span>Exportação & Relatórios</span>
+        </button>
+
+      </div>
+    </div>
+  </nav>
+
+  <!-- Conteúdo Principal -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full">
+
+    <!-- ========================================================= -->
+    <!-- ABA 1: AGENDA & CONSULTAS -->
+    <!-- ========================================================= -->
+    <section id="tab-agenda" class="tab-content block space-y-6">
+      
+      <!-- Barra de Filtros e Ação -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200/90 p-4 sm:p-5">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          
+          <!-- Controles de Data -->
+          <div class="flex flex-wrap items-center gap-2">
+            <button onclick="mudarDataRelativa(-1)" class="p-2 border border-slate-300 rounded-lg hover:bg-slate-100 text-slate-600 transition" title="Dia anterior">
+              <i class="fa-solid fa-chevron-left"></i>
+            </button>
+            <input type="date" id="filtro-data" onchange="carregarAgendamentos()" class="border border-slate-300 rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+            <button onclick="mudarDataRelativa(1)" class="p-2 border border-slate-300 rounded-lg hover:bg-slate-100 text-slate-600 transition" title="Próximo dia">
+              <i class="fa-solid fa-chevron-right"></i>
+            </button>
+            <button onclick="definirDataHoje()" class="px-3 py-2 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition">
+              Hoje
+            </button>
+          </div>
+
+          <!-- Filtros de Profissional e Status -->
+          <div class="flex flex-wrap items-center gap-3">
+            <select id="filtro-profissional" onchange="carregarAgendamentos()" class="border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+              <option value="">Todos os Profissionais</option>
+            </select>
+
+            <select id="filtro-status" onchange="carregarAgendamentos()" class="border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+              <option value="">Todos os Status</option>
+              <option value="Agendado">Agendado</option>
+              <option value="Confirmado">Confirmado</option>
+              <option value="Aguardando">Aguardando na Recepção</option>
+              <option value="Em Atendimento">Em Atendimento</option>
+              <option value="Atendido">Atendido / Concluído</option>
+              <option value="Faltou">Falta / Ausente</option>
+              <option value="Cancelado">Cancelado</option>
+            </select>
+
+            <!-- Botão Novo Agendamento -->
+            <button onclick="abrirModalAgendamento()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg text-sm shadow-sm flex items-center space-x-2 transition">
+              <i class="fa-solid fa-plus"></i>
+              <span>Novo Agendamento</span>
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Grade / Lista de Horários da Agenda -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200/90 overflow-hidden">
+        <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <h2 class="text-base font-bold text-slate-800" id="agenda-titulo-data">Agendamentos</h2>
+            <p class="text-xs text-slate-500">Horários organizados com salvamento automático e sincronismo bidirecional SUS</p>
+          </div>
+          <div class="flex items-center space-x-2 text-xs text-slate-500">
+            <span class="flex items-center space-x-1"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span> <span>Sincronizado</span></span>
+            <span class="flex items-center space-x-1"><span class="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span> <span>Pendente Envio</span></span>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm text-slate-600">
+            <thead class="bg-slate-50/80 text-xs uppercase font-semibold text-slate-500 border-b border-slate-200">
+              <tr>
+                <th class="px-5 py-3.5">Horário</th>
+                <th class="px-5 py-3.5">Paciente</th>
+                <th class="px-5 py-3.5">Cartão SUS / CPF</th>
+                <th class="px-5 py-3.5">Profissional & Especialidade</th>
+                <th class="px-5 py-3.5">Sala / UBS</th>
+                <th class="px-5 py-3.5">Status</th>
+                <th class="px-5 py-3.5">Origem / Sync</th>
+                <th class="px-5 py-3.5 text-right">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="tabela-agendamentos-corpo" class="divide-y divide-slate-100">
+              <!-- Linhas geradas via JavaScript -->
+              <tr>
+                <td colspan="8" class="text-center py-10 text-slate-400">
+                  <i class="fa-solid fa-spinner fa-spin text-2xl text-emerald-600 mb-2"></i>
+                  <p>Carregando agenda do dia...</p>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ========================================================= -->
+    <!-- ABA 2: CADASTRO DE PACIENTES -->
+    <!-- ========================================================= -->
+    <section id="tab-pacientes" class="tab-content hidden space-y-6">
+      
+      <!-- Barra Superior de Pacientes -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200/90 p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+        
+        <div class="relative w-full sm:w-96">
+          <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-400"></i>
+          <input type="text" id="busca-paciente" oninput="pesquisarPacientes()" placeholder="Buscar por Nome, CPF ou Cartão SUS..." class="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+        </div>
+
+        <button onclick="abrirModalPaciente()" class="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg text-sm shadow-sm flex items-center justify-center space-x-2 transition">
+          <i class="fa-solid fa-user-plus"></i>
+          <span>Cadastrar Novo Paciente</span>
+        </button>
+
+      </div>
+
+      <!-- Tabela de Pacientes -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200/90 overflow-hidden">
+        <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <h2 class="text-base font-bold text-slate-800">Cidadãos / Pacientes Cadastrados</h2>
+            <p class="text-xs text-slate-500">Dados cadastrais com salvamento automático contínuo e validação CNS/CPF</p>
+          </div>
+          <span id="contador-pacientes-badge" class="text-xs font-semibold bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full">0 Pacientes</span>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm text-slate-600">
+            <thead class="bg-slate-50/80 text-xs uppercase font-semibold text-slate-500 border-b border-slate-200">
+              <tr>
+                <th class="px-5 py-3.5">Nome do Paciente</th>
+                <th class="px-5 py-3.5">Cartão SUS (CNS)</th>
+                <th class="px-5 py-3.5">CPF</th>
+                <th class="px-5 py-3.5">Nascimento / Idade</th>
+                <th class="px-5 py-3.5">Contato</th>
+                <th class="px-5 py-3.5">Status Sync SUS</th>
+                <th class="px-5 py-3.5 text-right">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="tabela-pacientes-corpo" class="divide-y divide-slate-100">
+              <!-- Gerado via JavaScript -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ========================================================= -->
+    <!-- ABA 3: CENTRAL DE SINCRONISMO SUS -->
+    <!-- ========================================================= -->
+    <section id="tab-sync" class="tab-content hidden space-y-6">
+      
+      <!-- Card Informativo do Sincronismo -->
+      <div class="bg-gradient-to-r from-emerald-800 to-teal-800 rounded-2xl text-white p-6 shadow-md">
+        <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div class="space-y-1">
+            <div class="inline-flex items-center space-x-2 bg-emerald-600/60 px-3 py-1 rounded-full text-xs font-semibold text-emerald-100 mb-1">
+              <i class="fa-solid fa-arrows-split-up-and-left rotate-90"></i>
+              <span>Sincronização Bidirecional Ativa</span>
+            </div>
+            <h2 class="text-xl font-bold">Integração com e-SUS PEC & SISREG</h2>
+            <p class="text-sm text-emerald-100/90 max-w-2xl">
+              Este sistema mantém a agenda local e os pacientes salvos automaticamente sincronizados com o banco de dados do SUS. 
+              Alterações feitas nesta agenda sobem para o SUS, e agendamentos ou regulações do SUS descem para a agenda local.
+            </p>
+          </div>
+
+          <div class="flex flex-col sm:flex-row gap-2">
+            <button onclick="triggerManualSync()" class="bg-amber-400 hover:bg-amber-300 text-slate-900 font-bold px-4 py-2.5 rounded-xl text-sm shadow flex items-center justify-center space-x-2 transition">
+              <i class="fa-solid fa-arrows-rotate"></i>
+              <span>Forçar Sincronização Agora</span>
+            </button>
+            <button onclick="injetarConsultaSusTeste()" class="bg-white/20 hover:bg-white/30 text-white font-semibold px-4 py-2.5 rounded-xl text-sm border border-white/30 flex items-center justify-center space-x-2 transition" title="Simula uma nova consulta sendo agendada pelo SUS">
+              <i class="fa-solid fa-plus-circle"></i>
+              <span>Simular Consulta do SUS</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Configurações do Sincronizador -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Formulário de Configuração -->
+        <div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200/90 p-5 space-y-4">
+          <h3 class="text-base font-bold text-slate-800 flex items-center space-x-2">
+            <i class="fa-solid fa-sliders text-emerald-600"></i>
+            <span>Parâmetros de Integração</span>
+          </h3>
+
+          <form id="form-sync-config" onsubmit="salvarConfigSync(event)" class="space-y-4">
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-bold text-slate-600 mb-1">Nome da Unidade / Sistema Local</label>
+                <input type="text" id="cfg-sistema-origem" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" value="UBS Central / Agenda Local">
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold text-slate-600 mb-1">Sistema Remoto SUS</label>
+                <select id="cfg-sistema-destino" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+                  <option value="sus_pec">e-SUS PEC (Prontuário Eletrônico Cidadão)</option>
+                  <option value="sisreg">SISREG III (Regulação Municipal/Estadual)</option>
+                  <option value="google_calendar">Google Calendar / Agenda Externa</option>
+                  <option value="api_rest">API REST Padrão RNDS / FHIR</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-bold text-slate-600 mb-1">URL / Endpoint do Servidor SUS</label>
+                <input type="text" id="cfg-url" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" value="http://localhost:3000/api/mock-sus">
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold text-slate-600 mb-1">Token de Acesso / Certificado</label>
+                <input type="text" id="cfg-token" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" value="SUS-TOKEN-SECURE-2026">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+              <div>
+                <label class="block text-xs font-bold text-slate-600 mb-1">Intervalo Automático (segundos)</label>
+                <input type="number" id="cfg-intervalo" min="10" max="3600" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" value="60">
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold text-slate-600 mb-1">Resolução de Conflitos</label>
+                <select id="cfg-politica" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+                  <option value="mais_recente">Mais recente prevalece (Padrão)</option>
+                  <option value="priorizar_sus">Priorizar Sistema SUS</option>
+                  <option value="priorizar_local">Priorizar Agenda Local</option>
+                </select>
+              </div>
+
+              <div class="flex items-center pt-5">
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="cfg-auto-sync" class="sr-only peer" checked>
+                  <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                  <span class="ml-3 text-xs font-bold text-slate-700">Auto-Sync Ativo</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="pt-3 border-t border-slate-100 flex justify-end">
+              <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg text-sm transition">
+                Salvar Configurações
+              </button>
+            </div>
+
+          </form>
+        </div>
+
+        <!-- Status e Último Resultado -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200/90 p-5 space-y-4">
+          <h3 class="text-base font-bold text-slate-800 flex items-center space-x-2">
+            <i class="fa-solid fa-server text-emerald-600"></i>
+            <span>Status da Conexão</span>
+          </h3>
+
+          <div class="space-y-3">
+            <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
+              <div class="text-xs text-slate-500">Última Sincronização</div>
+              <div id="cfg-ultimo-sync" class="text-sm font-semibold text-slate-800">Aguardando...</div>
+            </div>
+
+            <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
+              <div class="text-xs text-slate-500">Último Relatório</div>
+              <div id="cfg-ultimo-status" class="text-xs text-slate-700 mt-1 leading-relaxed">Pronto</div>
+            </div>
+
+            <div class="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-emerald-800 text-xs">
+              <i class="fa-solid fa-circle-check text-emerald-600 mr-1"></i>
+              <span>Simulador SUS Integrado rodando nativamente para testes locais imediatos.</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Histórico de Logs de Sincronismo -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200/90 p-5 space-y-4">
+        <div class="flex items-center justify-between">
+          <h3 class="text-base font-bold text-slate-800 flex items-center space-x-2">
+            <i class="fa-solid fa-clock-rotate-left text-slate-500"></i>
+            <span>Histórico de Operações de Sincronização</span>
+          </h3>
+          <button onclick="carregarSyncLogs()" class="text-xs text-emerald-600 hover:underline">Atualizar Logs</button>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-slate-600">
+            <thead class="bg-slate-50 uppercase font-semibold text-slate-500 border-b border-slate-200">
+              <tr>
+                <th class="px-4 py-2.5">Horário</th>
+                <th class="px-4 py-2.5">Tipo</th>
+                <th class="px-4 py-2.5">Resultado</th>
+                <th class="px-4 py-2.5">Mensagem & Métricas</th>
+              </tr>
+            </thead>
+            <tbody id="tabela-logs-corpo" class="divide-y divide-slate-100">
+              <!-- Logs gerados via JavaScript -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ========================================================= -->
+    <!-- ABA 4: EXPORTAÇÃO & RELATÓRIOS -->
+    <!-- ========================================================= -->
+    <section id="tab-relatorios" class="tab-content hidden space-y-6">
+      
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200/90 p-6 space-y-6">
+        <div>
+          <h2 class="text-lg font-bold text-slate-800">Exportação de Dados da Saúde & Backup Local</h2>
+          <p class="text-sm text-slate-500">Exporte os dados completos dos pacientes e histórico de agendamentos no padrão e-SUS CDS / JSON.</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          
+          <div class="border border-slate-200 rounded-xl p-5 hover:border-emerald-500 transition space-y-3">
+            <div class="flex items-center space-x-3">
+              <div class="p-3 bg-emerald-100 text-emerald-700 rounded-xl text-xl">
+                <i class="fa-solid fa-file-code"></i>
+              </div>
+              <div>
+                <h3 class="font-bold text-slate-800">Exportação Completa (JSON)</h3>
+                <p class="text-xs text-slate-500">Pacientes, agendamentos, profissionais e logs de sync.</p>
+              </div>
+            </div>
+            <a href="/api/export/json" download="backup_sus_agenda.json" class="inline-flex items-center space-x-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg text-xs transition">
+              <i class="fa-solid fa-download"></i>
+              <span>Baixar Backup Completo</span>
+            </a>
+          </div>
+
+          <div class="border border-slate-200 rounded-xl p-5 hover:border-emerald-500 transition space-y-3">
+            <div class="flex items-center space-x-3">
+              <div class="p-3 bg-blue-100 text-blue-700 rounded-xl text-xl">
+                <i class="fa-solid fa-database"></i>
+              </div>
+              <div>
+                <h3 class="font-bold text-slate-800">Persistência SQLite Local</h3>
+                <p class="text-xs text-slate-500">Banco de dados com salvamento automático em <code class="bg-slate-100 px-1 py-0.5 rounded text-xs font-mono">sus_agenda.db</code>.</p>
+              </div>
+            </div>
+            <div class="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+              <i class="fa-solid fa-shield-halved text-emerald-600 mr-1"></i> Todos os registros e alterações são persistidos de forma imediata em disco no SQLite WAL local.
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- ========================================================= -->
+  <!-- MODAL: NOVO / EDITAR PACIENTE (COM SALVAMENTO AUTOMÁTICO) -->
+  <!-- ========================================================= -->
+  <div id="modal-paciente" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-2xl overflow-hidden animate-scale-in">
+      
+      <!-- Cabeçalho do Modal com status de salvamento -->
+      <div class="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+          <div class="p-2 bg-emerald-100 text-emerald-700 rounded-lg">
+            <i class="fa-solid fa-user"></i>
+          </div>
+          <div>
+            <h3 id="modal-paciente-titulo" class="font-bold text-slate-800 text-base">Ficha do Paciente (SUS)</h3>
+            <span id="modal-paciente-autosave" class="text-xs text-emerald-600 font-medium flex items-center space-x-1">
+              <i class="fa-solid fa-circle-check"></i>
+              <span>Salvamento automático ativado</span>
+            </span>
+          </div>
+        </div>
+        <button onclick="fecharModalPaciente()" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <!-- Formulário com Eventos onInput para Auto-save -->
+      <form id="form-paciente" class="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+        <input type="hidden" id="pac-id">
+
+        <!-- Linha 1: Nome Completo e Nome da Mãe -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Nome Completo *</label>
+            <input type="text" id="pac-nome" required oninput="triggerAutosavePaciente()" placeholder="Ex: Maria das Graças Silva" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Nome da Mãe</label>
+            <input type="text" id="pac-nome-mae" oninput="triggerAutosavePaciente()" placeholder="Nome completo da genitora" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+          </div>
+        </div>
+
+        <!-- Linha 2: Cartão SUS (CNS) e CPF -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <label class="block text-xs font-bold text-slate-700">Cartão Nacional de Saúde (CNS)</label>
+              <span id="cns-valido-badge" class="text-2xs text-slate-400">15 dígitos</span>
+            </div>
+            <input type="text" id="pac-cns" maxlength="15" oninput="validarEConsistirCNS(this); triggerAutosavePaciente()" placeholder="Ex: 700001234567890" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+          </div>
+
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <label class="block text-xs font-bold text-slate-700">CPF</label>
+              <span id="cpf-valido-badge" class="text-2xs text-slate-400">11 dígitos</span>
+            </div>
+            <input type="text" id="pac-cpf" maxlength="14" oninput="formatarEConsistirCPF(this); triggerAutosavePaciente()" placeholder="000.000.000-00" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+          </div>
+        </div>
+
+        <!-- Linha 3: Data de Nasc, Sexo, Telefone -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Data de Nascimento</label>
+            <input type="date" id="pac-data-nasc" oninput="triggerAutosavePaciente()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Sexo / Gênero</label>
+            <select id="pac-sexo" onchange="triggerAutosavePaciente()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+              <option value="F">Feminino</option>
+              <option value="M">Masculino</option>
+              <option value="Outro">Outro / Não Informado</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Telefone / WhatsApp</label>
+            <input type="text" id="pac-telefone" oninput="triggerAutosavePaciente()" placeholder="(11) 99999-9999" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+          </div>
+        </div>
+
+        <!-- Linha 4: Endereço, Bairro, CEP -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div class="sm:col-span-2">
+            <label class="block text-xs font-bold text-slate-700 mb-1">Endereço Residencial</label>
+            <input type="text" id="pac-endereco" oninput="triggerAutosavePaciente()" placeholder="Logradouro, número, complemento" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Bairro</label>
+            <input type="text" id="pac-bairro" oninput="triggerAutosavePaciente()" placeholder="Bairro" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+          </div>
+        </div>
+
+        <!-- Linha 5: Alergias e Condições Clínicas -->
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Alergias Conhecidas</label>
+          <input type="text" id="pac-alergias" oninput="triggerAutosavePaciente()" placeholder="Ex: Penicilina, Dipirona, Látex (ou Nenhuma)" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Observações Médicas / Prontuário</label>
+          <textarea id="pac-obs" rows="2" oninput="triggerAutosavePaciente()" placeholder="Comorbidades, medicamentos de uso contínuo, histórico..." class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none"></textarea>
+        </div>
+
+      </form>
+
+      <!-- Rodapé do Modal -->
+      <div class="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+        <div id="modal-paciente-status-save" class="text-xs text-slate-500">
+          Alterações são salvas automaticamente a cada digitação.
+        </div>
+        <div class="flex items-center space-x-2">
+          <button onclick="fecharModalPaciente()" class="px-4 py-2 border border-slate-300 hover:bg-slate-100 rounded-lg text-xs font-semibold text-slate-700 transition">
+            Fechar
+          </button>
+          <button onclick="salvarPacienteManual()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-sm transition">
+            Concluir & Salvar
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- MODAL: NOVO / EDITAR AGENDAMENTO (COM SALVAMENTO AUTOMÁTICO) -->
+  <!-- ========================================================= -->
+  <div id="modal-agendamento" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-xl overflow-hidden animate-scale-in">
+      
+      <div class="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+          <div class="p-2 bg-indigo-100 text-indigo-700 rounded-lg">
+            <i class="fa-regular fa-calendar-plus"></i>
+          </div>
+          <div>
+            <h3 id="modal-agendamento-titulo" class="font-bold text-slate-800 text-base">Consulta / Atendimento SUS</h3>
+            <span id="modal-ag-autosave" class="text-xs text-emerald-600 font-medium">Salvamento automático ativo</span>
+          </div>
+        </div>
+        <button onclick="fecharModalAgendamento()" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form id="form-agendamento" class="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+        <input type="hidden" id="ag-id">
+
+        <!-- Seleção de Paciente -->
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Paciente *</label>
+          <select id="ag-paciente-id" onchange="aoSelecionarPacienteParaAgendamento(this); triggerAutosaveAgendamento()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+            <option value="">Selecione um paciente cadastrado...</option>
+          </select>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Profissional de Saúde *</label>
+            <select id="ag-profissional-id" onchange="aoSelecionarProfissional(this); triggerAutosaveAgendamento()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+              <!-- Preenchido via JS -->
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Especialidade / Programa</label>
+            <input type="text" id="ag-especialidade" oninput="triggerAutosaveAgendamento()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" value="Clínica Médica / APS">
+          </div>
+        </div>
+
+        <!-- Data e Horários -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Data *</label>
+            <input type="date" id="ag-data" oninput="triggerAutosaveAgendamento()" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Início *</label>
+            <input type="time" id="ag-hora-inicio" oninput="triggerAutosaveAgendamento()" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" value="08:00">
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Término *</label>
+            <input type="time" id="ag-hora-fim" oninput="triggerAutosaveAgendamento()" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" value="08:30">
+          </div>
+        </div>
+
+        <!-- Sala e Tipo de Atendimento -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Sala / Consultório</label>
+            <input type="text" id="ag-sala" oninput="triggerAutosaveAgendamento()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" value="Consultório 1">
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Tipo de Consulta</label>
+            <select id="ag-tipo" onchange="triggerAutosaveAgendamento()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+              <option value="Consulta Eletiva">Consulta Eletiva</option>
+              <option value="Retorno Hiperdia">Retorno Hiperdia</option>
+              <option value="Puericultura / Infantil">Puericultura / Infantil</option>
+              <option value="Pré-Natal">Pré-Natal</option>
+              <option value="Procedimento / Curativo">Procedimento / Curativo</option>
+              <option value="Encaminhamento SISREG">Encaminhamento SISREG</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Status -->
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Status do Atendimento</label>
+          <select id="ag-status" onchange="triggerAutosaveAgendamento()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+            <option value="Agendado">Agendado</option>
+            <option value="Confirmado">Confirmado</option>
+            <option value="Aguardando">Aguardando na Recepção</option>
+            <option value="Em Atendimento">Em Atendimento</option>
+            <option value="Atendido">Atendido / Concluído</option>
+            <option value="Faltou">Falta / Não Compareceu</option>
+            <option value="Cancelado">Cancelado</option>
+          </select>
+        </div>
+
+        <!-- Observações -->
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Observações da Consulta</label>
+          <textarea id="ag-obs" rows="2" oninput="triggerAutosaveAgendamento()" placeholder="Motivo do atendimento, queixa principal, encaminhamentos..." class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none"></textarea>
+        </div>
+
+      </form>
+
+      <div class="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+        <div id="modal-ag-status-save" class="text-xs text-slate-500">
+          Auto-save salva instantaneamente no banco SQLite e prepara sync SUS.
+        </div>
+        <div class="flex items-center space-x-2">
+          <button onclick="fecharModalAgendamento()" class="px-4 py-2 border border-slate-300 hover:bg-slate-100 rounded-lg text-xs font-semibold text-slate-700 transition">
+            Fechar
+          </button>
+          <button onclick="salvarAgendamentoManual()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-sm transition">
+            Confirmar & Salvar
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Toast de Notificações Rápidas -->
+  <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+    <div class="bg-slate-900 text-white px-4 py-3 rounded-xl shadow-lg border border-slate-700 flex items-center space-x-3 text-sm">
+      <i id="toast-icon" class="fa-solid fa-circle-check text-emerald-400"></i>
+      <span id="toast-message">Operação realizada com sucesso!</span>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

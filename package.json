@@ -1,0 +1,12 @@
+{
+  "name": "sus-sinc-agenda",
+  "version": "1.0.0",
+  "description": "Sistema de Gestão de Pacientes e Agenda com Sincronização Automática com o SUS (e-SUS PEC / SISREG)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": ["sus", "e-sus", "sisreg", "agenda", "pacientes", "sincronizacao"],
+  "author": "",
+  "license": "MIT"
+}
