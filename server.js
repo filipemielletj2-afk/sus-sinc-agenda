@@ -5,7 +5,15 @@ const url = require('node:url');
 const crypto = require('node:crypto');
 
 const { db, initDatabase, validarCNS, validarCPF } = require('./database');
-const { executeSync, startAutoSync, stopAutoSync, testarConexaoEsus } = require('./sync_engine');
+const {
+  executeSync,
+  startAutoSync,
+  stopAutoSync,
+  testarConexaoEsus,
+  parsearTextoAgendaEsus,
+  importarAgendamentosEsus,
+  carregarAgendaDemonstracaoEsus
+} = require('./sync_engine');
 const susMock = require('./sus_mock');
 
 // Initialize database schema and seed data
@@ -55,7 +63,7 @@ function sendJson(res, statusCode, data) {
     'Content-Type': 'application/json; charset=utf-8',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, *'
   });
   res.end(JSON.stringify(data));
 }
@@ -71,7 +79,7 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(204, {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, *'
     });
     return res.end();
   }
@@ -531,7 +539,45 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  // 4. SINCRONIZAÇÃO
+  // 4. SINCRONIZAÇÃO E IMPORTAÇÃO EXCLUSIVA DE AGENDAS DO e-SUS PEC
+  // 4.1 Script Extrator / Bookmarklet para e-SUS Imbuia
+  if ((pathname === '/api/agenda/bookmarklet.js' || pathname === '/extrator-esus.js') && method === 'GET') {
+    const scriptPath = path.join(PUBLIC_DIR, 'extrator-esus.js');
+    return fs.readFile(scriptPath, 'utf8', (err, content) => {
+      if (err) {
+        res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+        return res.end('Erro ao carregar o script do extrator.');
+      }
+      res.writeHead(200, {
+        'Content-Type': 'application/javascript; charset=utf-8',
+        'Access-Control-Allow-Origin': '*'
+      });
+      res.end(content);
+    });
+  }
+
+  // 4.2 Importação direta de agendamentos extraídos ou colados do e-SUS PEC
+  if (pathname === '/api/agenda/importar-esus' && method === 'POST') {
+    try {
+      const data = await parseRequestBody(req);
+      const resultado = importarAgendamentosEsus(data);
+      return sendJson(res, 200, resultado);
+    } catch (err) {
+      return sendJson(res, 500, { success: false, error: err.message });
+    }
+  }
+
+  // 4.3 Carga imediata de agenda demonstrativa padrão e-SUS PEC
+  if (pathname === '/api/agenda/carregar-amostra-esus' && method === 'POST') {
+    try {
+      const data = await parseRequestBody(req);
+      const resultado = carregarAgendaDemonstracaoEsus(data.data, data.profissional);
+      return sendJson(res, 200, resultado);
+    } catch (err) {
+      return sendJson(res, 500, { success: false, error: err.message });
+    }
+  }
+
   if (pathname === '/api/sync/trigger' && method === 'POST') {
     const result = await executeSync('manual');
     return sendJson(res, 200, result);

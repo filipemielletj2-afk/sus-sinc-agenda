@@ -48,9 +48,9 @@
         </div>
 
         <!-- Botão Sincronizar Agora -->
-        <button id="btn-sync-now" onclick="triggerManualSync()" class="bg-amber-400 hover:bg-amber-300 text-slate-900 font-bold px-3 py-1.5 rounded-lg text-xs shadow-sm flex items-center space-x-1.5 transition transform active:scale-95">
+        <button id="btn-sync-now" onclick="abrirModalSincronizarAgenda()" class="bg-amber-400 hover:bg-amber-300 text-slate-900 font-bold px-3 py-1.5 rounded-lg text-xs shadow-sm flex items-center space-x-1.5 transition transform active:scale-95" title="Sincronizar Agenda com e-SUS Imbuia">
           <i id="btn-sync-icon" class="fa-solid fa-arrows-rotate"></i>
-          <span>Sincronizar PEC</span>
+          <span>Sincronizar Agenda e-SUS</span>
         </button>
 
       </div>
@@ -154,6 +154,12 @@
             <button onclick="imprimirAgendaProfissional()" class="px-3 py-1.5 text-xs font-semibold border border-slate-300 hover:bg-slate-100 text-slate-700 rounded-lg shadow-xs flex items-center space-x-1.5 transition" title="Imprimir a grade de atendimentos do profissional (Seção 4.3)">
               <i class="fa-solid fa-print text-slate-500"></i>
               <span>Imprimir Agenda</span>
+            </button>
+
+            <!-- Sincronização Exclusiva de Agendas e-SUS PEC -->
+            <button onclick="abrirModalSincronizarAgenda()" class="bg-teal-600 hover:bg-teal-700 text-white font-bold px-3.5 py-1.5 rounded-lg text-xs shadow flex items-center space-x-1.5 transition">
+              <i class="fa-solid fa-arrows-rotate"></i>
+              <span>Sincronizar Agenda e-SUS</span>
             </button>
 
             <!-- 4.1 Agendar Nova Consulta -->
@@ -305,7 +311,7 @@
             </h2>
             <p class="text-xs text-emerald-100/90 max-w-2xl">
               Endereço configurado: <code class="bg-black/30 px-1.5 py-0.5 rounded font-mono text-amber-300">https://esus.imbuia.sc.gov.br/agenda</code>.
-              Sincronização bidirecional de agendamentos e cadastros de cidadãos da Atenção Primária.
+              Sincronização focada exclusivamente nas agendas e horários de atendimento da Atenção Primária.
             </p>
           </div>
 
@@ -314,9 +320,9 @@
               <i class="fa-solid fa-satellite-dish"></i>
               <span>Testar Conexão</span>
             </button>
-            <button onclick="triggerManualSync()" class="bg-amber-400 hover:bg-amber-300 text-slate-900 font-bold px-3.5 py-2 rounded-lg text-xs shadow flex items-center space-x-1.5 transition">
+            <button onclick="abrirModalSincronizarAgenda()" class="bg-amber-400 hover:bg-amber-300 text-slate-900 font-bold px-3.5 py-2 rounded-lg text-xs shadow flex items-center space-x-1.5 transition">
               <i class="fa-solid fa-arrows-rotate"></i>
-              <span>Sincronizar Agora</span>
+              <span>Sincronizar Agenda</span>
             </button>
           </div>
         </div>
@@ -1031,6 +1037,185 @@
           <button onclick="fecharModalPaciente()" class="px-3 py-1.5 border border-slate-300 rounded text-xs text-slate-700">Fechar</button>
           <button onclick="salvarPacienteManual()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded text-xs font-bold shadow-xs">Concluir & Salvar</button>
         </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- MODAL: SINCRONIZAR AGENDAS COM O e-SUS IMBUIA -->
+  <!-- ========================================================= -->
+  <div id="modal-sincronizar-agenda" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-2xl shadow-2xl border border-slate-300 w-full max-w-2xl overflow-hidden animate-scale-in">
+      
+      <!-- Cabeçalho -->
+      <div class="px-5 py-4 bg-gradient-to-r from-teal-800 to-emerald-900 text-white flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-xl text-teal-300 border border-white/20">
+            <i class="fa-solid fa-arrows-rotate animate-spin-slow"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-base">Sincronização de Agenda com e-SUS PEC</h3>
+            <p class="text-xs text-teal-200/90">Servidor configurado: <span class="font-mono text-amber-300">https://esus.imbuia.sc.gov.br/agenda</span></p>
+          </div>
+        </div>
+        <button onclick="fecharModalSincronizarAgenda()" class="text-white/70 hover:text-white p-1 rounded hover:bg-white/10 transition">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <!-- Abas de Métodos de Sincronismo da Agenda -->
+      <div class="flex border-b border-slate-200 bg-slate-100/80 text-xs font-bold px-4 pt-2.5 space-x-1 overflow-x-auto">
+        <button type="button" onclick="trocarAbaSyncAgenda('extrator')" id="tab-sync-extrator" class="px-3.5 py-2 rounded-t-lg bg-white border-t border-l border-r border-slate-300 text-emerald-800 flex items-center space-x-1.5 transition">
+          <i class="fa-solid fa-bolt text-amber-500"></i>
+          <span>1-Clique no Navegador</span>
+        </button>
+        <button type="button" onclick="trocarAbaSyncAgenda('colar')" id="tab-sync-colar" class="px-3.5 py-2 rounded-t-lg text-slate-600 hover:text-slate-800 hover:bg-slate-200/60 flex items-center space-x-1.5 transition">
+          <i class="fa-solid fa-paste text-teal-600"></i>
+          <span>Colar Tabela da Agenda</span>
+        </button>
+        <button type="button" onclick="trocarAbaSyncAgenda('sessao')" id="tab-sync-sessao" class="px-3.5 py-2 rounded-t-lg text-slate-600 hover:text-slate-800 hover:bg-slate-200/60 flex items-center space-x-1.5 transition">
+          <i class="fa-solid fa-key text-blue-600"></i>
+          <span>Sessão / Token e-SUS</span>
+        </button>
+        <button type="button" onclick="trocarAbaSyncAgenda('amostra')" id="tab-sync-amostra" class="px-3.5 py-2 rounded-t-lg text-slate-600 hover:text-slate-800 hover:bg-slate-200/60 flex items-center space-x-1.5 transition">
+          <i class="fa-solid fa-wand-magic-sparkles text-purple-600"></i>
+          <span>Agenda Padrão PEC</span>
+        </button>
+      </div>
+
+      <div class="p-5 max-h-[70vh] overflow-y-auto text-xs space-y-4">
+        
+        <!-- PAINEL 1: 1-CLIQUE NO NAVEGADOR (BOOKMARKLET) -->
+        <div id="painel-sync-extrator" class="space-y-4">
+          <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 text-slate-700 space-y-2">
+            <h4 class="font-bold text-amber-900 text-sm flex items-center space-x-2">
+              <i class="fa-solid fa-star text-amber-500"></i>
+              <span>Método Mais Fácil e Rápido (1-Clique)</span>
+            </h4>
+            <p class="text-xs leading-relaxed">
+              Como o servidor oficial do e-SUS de Imbuia exige autenticação no seu navegador, este botão lê a tela da agenda que você já está visualizando e transfere todos os horários e pacientes em 1 segundo diretamente para o seu programa:
+            </p>
+          </div>
+
+          <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+            <div class="text-xs font-bold text-slate-800">Passo 1: Arraste o botão abaixo para a sua barra de favoritos</div>
+            <div class="flex items-center space-x-3">
+              <a href="javascript:(function(){const s=document.createElement('script');s.src='http://localhost:3000/extrator-esus.js?t='+Date.now();document.body.appendChild(s);})();" class="inline-flex items-center space-x-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold px-4 py-2.5 rounded-xl shadow-md hover:from-emerald-700 hover:to-teal-700 cursor-grab active:cursor-grabbing border-2 border-dashed border-emerald-300" title="Arraste para a barra de favoritos do navegador">
+                <i class="fa-solid fa-arrows-rotate fa-spin-pulse text-amber-300"></i>
+                <span>⚡ Sincronizar com SUS-Sinc</span>
+              </a>
+              <span class="text-2xs text-slate-500">👈 Arraste para a barra (Ctrl + Shift + B no Chrome/Edge)</span>
+            </div>
+
+            <div class="border-t border-slate-200 pt-3 space-y-2">
+              <div class="text-xs font-bold text-slate-800">Passo 2: Acesse o e-SUS e clique no favorito</div>
+              <ol class="list-decimal list-inside space-y-1 text-slate-600 text-xs">
+                <li>Abra <a href="https://esus.imbuia.sc.gov.br/agenda" target="_blank" class="text-emerald-700 underline font-semibold">https://esus.imbuia.sc.gov.br/agenda</a> com seu login normal do e-SUS.</li>
+                <li>Na tela onde aparece a grade de horários, clique no favorito <strong>⚡ Sincronizar com SUS-Sinc</strong>.</li>
+                <li>Pronto! Uma mensagem verde aparecerá na tela e todos os agendamentos serão salvos aqui no SQLite.</li>
+              </ol>
+            </div>
+
+            <div class="border-t border-slate-200 pt-3">
+              <div class="flex items-center justify-between mb-1.5">
+                <span class="text-2xs font-bold text-slate-500 uppercase">Ou copie o comando para colar no Console do navegador (F12):</span>
+                <button type="button" onclick="copiarComandoExtratorConsole()" id="btn-copiar-console" class="text-2xs text-emerald-700 hover:underline font-bold flex items-center space-x-1">
+                  <i class="fa-solid fa-copy"></i>
+                  <span>Copiar Script</span>
+                </button>
+              </div>
+              <input type="text" readonly id="input-comando-extrator" class="w-full bg-slate-900 text-emerald-400 font-mono text-2xs p-2 rounded border border-slate-700 select-all" value="fetch('http://localhost:3000/extrator-esus.js?t='+Date.now()).then(r=>r.text()).then(eval);">
+            </div>
+          </div>
+        </div>
+
+        <!-- PAINEL 2: COLAR TABELA DA AGENDA -->
+        <div id="painel-sync-colar" class="hidden space-y-3">
+          <div class="bg-teal-50 border border-teal-200 rounded-xl p-3.5 text-teal-900 text-xs leading-relaxed">
+            <i class="fa-solid fa-circle-info text-teal-600 mr-1"></i>
+            Abra o e-SUS Imbuia, selecione com o mouse a tabela de atendimentos do dia (ou use Ctrl+A), copie (Ctrl+C) e cole no campo abaixo. Nosso leitor inteligente identifica automaticamente horários, nomes, CNS e status:
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">Data da Agenda *</label>
+              <input type="date" id="colar-data-agenda" class="w-full border border-slate-300 rounded px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">Profissional da Agenda *</label>
+              <select id="colar-prof-agenda" class="w-full border border-slate-300 rounded px-2.5 py-1.5 text-xs bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                <!-- Carregado via JS -->
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Cole aqui o texto ou tabela copiada da agenda do e-SUS:</label>
+            <textarea id="colar-texto-agenda" rows="6" placeholder="Exemplo:
+08:00	08:30	Maria de Lourdes	704501234567890	Consulta Médica	Atendido
+08:30	09:00	João Carlos	700009876543210	Puericultura	Aguardando
+..." class="w-full border border-slate-300 rounded p-2.5 font-mono text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"></textarea>
+          </div>
+
+          <div class="flex justify-end pt-2">
+            <button type="button" onclick="processarImportacaoAgendaColada()" id="btn-processar-colada" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-lg text-xs shadow flex items-center space-x-2 transition">
+              <i class="fa-solid fa-file-import"></i>
+              <span>Importar & Salvar na Agenda</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- PAINEL 3: SESSÃO / COOKIE e-SUS -->
+        <div id="painel-sync-sessao" class="hidden space-y-3">
+          <div class="bg-blue-50 border border-blue-200 rounded-xl p-3.5 text-blue-900 text-xs leading-relaxed">
+            <i class="fa-solid fa-lock text-blue-600 mr-1"></i>
+            Insira o cookie de sessão ativa (<code class="bg-blue-100 px-1 py-0.5 rounded font-mono">JSESSIONID</code>) do e-SUS Imbuia para que o sincronizador em segundo plano faça downloads diretos:
+          </div>
+
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Cookie de Sessão (JSESSIONID) ou Token</label>
+            <input type="text" id="sync-sessao-input" placeholder="Ex: 8A72B3C4D5E6F7G8H9I0 ou JSESSIONID=..." class="w-full border border-slate-300 rounded px-2.5 py-1.5 text-xs font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+          </div>
+
+          <div class="flex justify-between items-center pt-2">
+            <a href="https://esus.imbuia.sc.gov.br/agenda" target="_blank" class="text-2xs text-blue-700 hover:underline flex items-center space-x-1">
+              <i class="fa-solid fa-arrow-up-right-from-square"></i>
+              <span>Abrir e-SUS Imbuia</span>
+            </a>
+            <button type="button" onclick="salvarETestarSessaoEsus()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 rounded-lg text-xs shadow transition">
+              Salvar & Sincronizar Direto
+            </button>
+          </div>
+        </div>
+
+        <!-- PAINEL 4: AGENDA DEMONSTRATIVA PEC -->
+        <div id="painel-sync-amostra" class="hidden space-y-3">
+          <div class="bg-purple-50 border border-purple-200 rounded-xl p-3.5 text-purple-900 text-xs leading-relaxed">
+            <i class="fa-solid fa-wand-magic-sparkles text-purple-600 mr-1"></i>
+            Deseja testar ou ver a agenda completa funcionando imediatamente? Clique no botão abaixo para carregar uma grade de atendimentos completa no padrão oficial do e-SUS PEC (consultas, puericultura, hiperdia, reservas de horário e pré-natal):
+          </div>
+
+          <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg text-2xs space-y-1 text-slate-600">
+            <div class="font-bold text-slate-800">Esta ação irá preencher o dia selecionado com:</div>
+            <div>• 9 consultas clínicas e de pré-natal com CNS e status reais</div>
+            <div>• 2 reservas de horários para Reunião de Equipe e Matriciamento</div>
+            <div>• Marcação com status 'Sincronizado' no padrão oficial do Ministério da Saúde</div>
+          </div>
+
+          <div class="flex justify-end pt-2">
+            <button type="button" onclick="carregarAmostraOficialEsus()" id="btn-carregar-amostra" class="bg-purple-600 hover:bg-purple-700 text-white font-bold px-4 py-2 rounded-lg text-xs shadow flex items-center space-x-2 transition">
+              <i class="fa-solid fa-wand-magic-sparkles"></i>
+              <span>Carregar Grade Padrão e-SUS Agora</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="px-5 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs">
+        <span class="text-2xs text-slate-500">Focado exclusivamente na sincronização de horários e agendas da UBS.</span>
+        <button onclick="fecharModalSincronizarAgenda()" class="px-3.5 py-1.5 border border-slate-300 rounded text-xs text-slate-700 hover:bg-slate-100">Fechar</button>
       </div>
 
     </div>

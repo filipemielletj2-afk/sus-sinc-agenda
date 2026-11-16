@@ -1327,3 +1327,170 @@ async function carregarSyncLogs() {
     `).join('');
   } catch (err) {}
 }
+
+// -------------------------------------------------------------
+// SINCRONIZAÇÃO EXCLUSIVA DE AGENDAS (e-SUS PEC IMBUIA)
+// -------------------------------------------------------------
+
+function abrirModalSincronizarAgenda() {
+  const modal = document.getElementById('modal-sincronizar-agenda');
+  if (!modal) return;
+
+  const dataHoje = document.getElementById('filtro-data').value || new Date().toISOString().split('T')[0];
+  const colarData = document.getElementById('colar-data-agenda');
+  if (colarData) colarData.value = dataHoje;
+
+  const profSelect = document.getElementById('colar-prof-agenda');
+  if (profSelect) {
+    profSelect.innerHTML = state.profissionais.map(p => `
+      <option value="${p.nome}" ${state.profissionalSelecionado && state.profissionalSelecionado.id === p.id ? 'selected' : ''}>
+        ${p.nome} (${p.cargo})
+      </option>
+    `).join('');
+  }
+
+  const tokenInput = document.getElementById('sync-sessao-input');
+  if (tokenInput && state.syncConfig && state.syncConfig.token_sessao_esus) {
+    tokenInput.value = state.syncConfig.token_sessao_esus;
+  }
+
+  modal.classList.remove('hidden');
+}
+
+function fecharModalSincronizarAgenda() {
+  const modal = document.getElementById('modal-sincronizar-agenda');
+  if (modal) modal.classList.add('hidden');
+}
+
+function trocarAbaSyncAgenda(abaId) {
+  const abas = ['extrator', 'colar', 'sessao', 'amostra'];
+  abas.forEach(aba => {
+    const painel = document.getElementById(`painel-sync-${aba}`);
+    const btn = document.getElementById(`tab-sync-${aba}`);
+    if (painel) painel.classList.add('hidden');
+    if (btn) {
+      btn.className = 'px-3.5 py-2 rounded-t-lg text-slate-600 hover:text-slate-800 hover:bg-slate-200/60 flex items-center space-x-1.5 transition';
+    }
+  });
+
+  const painelAtivo = document.getElementById(`painel-sync-${abaId}`);
+  const btnAtivo = document.getElementById(`tab-sync-${abaId}`);
+  if (painelAtivo) painelAtivo.classList.remove('hidden');
+  if (btnAtivo) {
+    btnAtivo.className = 'px-3.5 py-2 rounded-t-lg bg-white border-t border-l border-r border-slate-300 text-emerald-800 flex items-center space-x-1.5 transition font-bold';
+  }
+}
+
+function copiarComandoExtratorConsole() {
+  const input = document.getElementById('input-comando-extrator');
+  if (!input) return;
+  input.select();
+  navigator.clipboard.writeText(input.value);
+  const btn = document.getElementById('btn-copiar-console');
+  if (btn) {
+    btn.innerHTML = '<i class="fa-solid fa-check text-emerald-600"></i> Copiado!';
+    setTimeout(() => {
+      btn.innerHTML = '<i class="fa-solid fa-copy"></i> Copiar Script';
+    }, 2500);
+  }
+  showToast('Script copiado! Cole no Console do navegador (F12) no e-SUS.');
+}
+
+async function processarImportacaoAgendaColada() {
+  const texto = document.getElementById('colar-texto-agenda').value.trim();
+  const data = document.getElementById('colar-data-agenda').value;
+  const profissional = document.getElementById('colar-prof-agenda').value;
+
+  if (!texto) {
+    return alert('Por favor, cole o texto ou a tabela copiada da agenda do e-SUS antes de importar.');
+  }
+
+  const btn = document.getElementById('btn-processar-colada');
+  const orig = btn.innerHTML;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Importando...</span>';
+
+  try {
+    const res = await fetch('/api/agenda/importar-esus', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ texto, data, profissional })
+    });
+    const result = await res.json();
+
+    if (res.ok && result.success) {
+      fecharModalSincronizarAgenda();
+      showToast(result.message || 'Agenda sincronizada com sucesso!');
+      document.getElementById('colar-texto-agenda').value = '';
+      await carregarAgendamentos(true);
+      await carregarStatusGeral();
+      await carregarSyncLogs();
+    } else {
+      alert(`Aviso: ${result.message || result.error || 'Nenhum agendamento foi identificado no texto.'}`);
+    }
+  } catch (err) {
+    alert(`Erro ao importar: ${err.message}`);
+  } finally {
+    btn.innerHTML = orig;
+  }
+}
+
+async function salvarETestarSessaoEsus() {
+  const token = document.getElementById('sync-sessao-input').value.trim();
+  try {
+    await fetch('/api/sync/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token_sessao_esus: token,
+        sistema_destino_url: 'https://esus.imbuia.sc.gov.br/agenda'
+      })
+    });
+
+    showToast('Token e-SUS salvo! Executando busca de agenda...');
+    const resSync = await fetch('/api/sync/trigger', { method: 'POST' });
+    const dataSync = await resSync.json();
+
+    if (dataSync.success) {
+      fecharModalSincronizarAgenda();
+      showToast(dataSync.message || 'Agenda atualizada com o e-SUS!');
+      await carregarAgendamentos(true);
+      await carregarSyncLogs();
+    } else {
+      showToast('Token salvo. Você também pode usar o botão 1-Clique.', 'fa-triangle-exclamation');
+    }
+  } catch (err) {
+    showToast('Erro ao comunicar com o servidor', 'fa-triangle-exclamation', true);
+  }
+}
+
+async function carregarAmostraOficialEsus() {
+  const dataHoje = document.getElementById('filtro-data').value || new Date().toISOString().split('T')[0];
+  const profNome = (state.profissionalSelecionado && state.profissionalSelecionado.nome) || 'Dr. Carlos Eduardo Ramos';
+
+  const btn = document.getElementById('btn-carregar-amostra');
+  const orig = btn.innerHTML;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Carregando...</span>';
+
+  try {
+    const res = await fetch('/api/agenda/carregar-amostra-esus', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: dataHoje, profissional: profNome })
+    });
+    const result = await res.json();
+
+    if (result.success) {
+      fecharModalSincronizarAgenda();
+      showToast(`Grade demonstrativa e-SUS PEC carregada com sucesso! (${result.count} atendimentos)`);
+      await carregarAgendamentos(true);
+      await carregarStatusGeral();
+      await carregarSyncLogs();
+    } else {
+      alert(`Aviso: ${result.message || 'Erro ao carregar amostra'}`);
+    }
+  } catch (err) {
+    alert(`Erro ao carregar amostra: ${err.message}`);
+  } finally {
+    btn.innerHTML = orig;
+  }
+}
