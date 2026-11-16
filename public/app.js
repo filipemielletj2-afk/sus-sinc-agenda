@@ -855,22 +855,94 @@ async function injetarConsultaSusTeste() {
   }
 }
 
+async function testarConexaoEsusImbuia() {
+  const btn = document.getElementById('btn-testar-imbuia');
+  const card = document.getElementById('card-diagnostico-imbuia');
+  const originalHtml = btn.innerHTML;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Testando...</span>';
+
+  const urlAlvo = document.getElementById('cfg-url').value || 'https://esus.imbuia.sc.gov.br/agenda';
+
+  try {
+    const res = await fetch('/api/sync/testar-conexao', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: urlAlvo })
+    });
+    const data = await res.json();
+
+    if (data.online) {
+      showToast(`Servidor e-SUS de Imbuia respondendo! (${data.latencia_ms}ms)`);
+      card.className = 'p-3 bg-emerald-50 rounded-xl border border-emerald-300 text-xs space-y-1';
+      card.innerHTML = `
+        <div class="font-bold text-emerald-800 flex items-center space-x-1.5">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+          <span>e-SUS PEC Imbuia: ONLINE (${data.latencia_ms}ms)</span>
+        </div>
+        <p class="text-emerald-700 text-2xs leading-relaxed">
+          ${data.mensagem}
+        </p>
+      `;
+    } else {
+      showToast('Falha ao conectar com e-SUS Imbuia', 'fa-triangle-exclamation', true);
+      card.className = 'p-3 bg-amber-50 rounded-xl border border-amber-300 text-xs space-y-1';
+      card.innerHTML = `
+        <div class="font-bold text-amber-800 flex items-center space-x-1.5">
+          <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+          <span>Atenção na Conexão</span>
+        </div>
+        <p class="text-amber-700 text-2xs leading-relaxed">
+          ${data.mensagem || data.erro}
+        </p>
+      `;
+    }
+  } catch (err) {
+    showToast('Erro ao testar conectividade', 'fa-triangle-exclamation', true);
+  } finally {
+    btn.innerHTML = originalHtml;
+  }
+}
+
+async function alternarModoSimulador() {
+  const isSimulador = state.syncConfig && state.syncConfig.simulador_sus_ativo;
+  const novoModo = isSimulador ? 0 : 1;
+
+  const urlInput = document.getElementById('cfg-url');
+  if (novoModo === 1) {
+    urlInput.value = 'http://localhost:3000/api/mock-sus';
+    showToast('Modo alternado para: Simulador Local de Testes');
+  } else {
+    urlInput.value = 'https://esus.imbuia.sc.gov.br/agenda';
+    showToast('Modo alternado para: e-SUS Oficial de Imbuia / SC');
+  }
+
+  const btnToggle = document.getElementById('btn-toggle-simulador');
+  btnToggle.textContent = novoModo === 1 ? 'Alternar para Servidor Oficial de Imbuia' : 'Alternar para Simulador Local de Testes';
+}
+
 async function carregarConfigSync() {
   try {
     const res = await fetch('/api/sync/config');
     const cfg = await res.json();
     state.syncConfig = cfg;
 
-    document.getElementById('cfg-sistema-origem').value = cfg.sistema_origem_nome || '';
+    document.getElementById('cfg-sistema-origem').value = cfg.sistema_origem_nome || 'UBS Imbuia / Agenda Local';
     document.getElementById('cfg-sistema-destino').value = cfg.sistema_destino_tipo || 'sus_pec';
-    document.getElementById('cfg-url').value = cfg.sistema_destino_url || '';
-    document.getElementById('cfg-token').value = cfg.api_token || '';
+    document.getElementById('cfg-url').value = cfg.sistema_destino_url || 'https://esus.imbuia.sc.gov.br/agenda';
+    document.getElementById('cfg-usuario-esus').value = cfg.usuario_esus || '';
+    document.getElementById('cfg-senha-esus').value = cfg.senha_esus || '';
+    document.getElementById('cfg-token-sessao').value = cfg.token_sessao_esus || '';
     document.getElementById('cfg-intervalo').value = cfg.intervalo_segundos || 60;
     document.getElementById('cfg-politica').value = cfg.politica_conflito || 'mais_recente';
     document.getElementById('cfg-auto-sync').checked = Boolean(cfg.auto_sync_enabled);
 
     document.getElementById('cfg-ultimo-sync').textContent = cfg.ultimo_sync ? formatarTimestamp(cfg.ultimo_sync) : 'Nunca';
-    document.getElementById('cfg-ultimo-status').textContent = cfg.ultimo_status || 'Aguardando sincronismo';
+    document.getElementById('cfg-ultimo-status').textContent = cfg.ultimo_status || 'Pronto';
+
+    const btnToggle = document.getElementById('btn-toggle-simulador');
+    if (btnToggle) {
+      btnToggle.textContent = cfg.simulador_sus_ativo ? 'Alternar para Servidor Oficial de Imbuia' : 'Alternar para Simulador Local de Testes';
+    }
   } catch (err) {
     console.error('Erro ao carregar configurações de sync:', err);
   }
@@ -882,11 +954,13 @@ async function salvarConfigSync(e) {
     sistema_origem_nome: document.getElementById('cfg-sistema-origem').value,
     sistema_destino_tipo: document.getElementById('cfg-sistema-destino').value,
     sistema_destino_url: document.getElementById('cfg-url').value,
-    api_token: document.getElementById('cfg-token').value,
+    usuario_esus: document.getElementById('cfg-usuario-esus').value,
+    senha_esus: document.getElementById('cfg-senha-esus').value,
+    token_sessao_esus: document.getElementById('cfg-token-sessao').value,
     intervalo_segundos: parseInt(document.getElementById('cfg-intervalo').value, 10),
     politica_conflito: document.getElementById('cfg-politica').value,
     auto_sync_enabled: document.getElementById('cfg-auto-sync').checked ? 1 : 0,
-    simulador_sus_ativo: 1
+    simulador_sus_ativo: (document.getElementById('cfg-url').value.includes('localhost') ? 1 : 0)
   };
 
   try {
@@ -897,7 +971,7 @@ async function salvarConfigSync(e) {
     });
     const data = await res.json();
     if (data.success) {
-      showToast('Configurações de sincronização salvas com sucesso!');
+      showToast('Configurações salvas! Sincronizador atualizado.');
       await carregarConfigSync();
       await carregarStatusGeral();
     }

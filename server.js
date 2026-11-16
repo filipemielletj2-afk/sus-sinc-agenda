@@ -5,7 +5,7 @@ const url = require('node:url');
 const crypto = require('node:crypto');
 
 const { db, initDatabase, validarCNS, validarCPF } = require('./database');
-const { executeSync, startAutoSync, stopAutoSync } = require('./sync_engine');
+const { executeSync, startAutoSync, stopAutoSync, testarConexaoEsus } = require('./sync_engine');
 const susMock = require('./sus_mock');
 
 // Initialize database schema and seed data
@@ -408,6 +408,17 @@ const server = http.createServer(async (req, res) => {
     return sendJson(res, 200, result);
   }
 
+  if (pathname === '/api/sync/testar-conexao' && method === 'POST') {
+    try {
+      const data = await parseRequestBody(req);
+      const targetUrl = data.url || 'https://esus.imbuia.sc.gov.br/agenda';
+      const result = await testarConexaoEsus(targetUrl);
+      return sendJson(res, 200, result);
+    } catch (err) {
+      return sendJson(res, 500, { online: false, erro: err.message });
+    }
+  }
+
   if (pathname === '/api/sync/config') {
     if (method === 'GET') {
       const config = db.prepare('SELECT * FROM sync_config WHERE id = 1').get();
@@ -419,14 +430,18 @@ const server = http.createServer(async (req, res) => {
         db.prepare(`
           UPDATE sync_config SET
             sistema_origem_nome = ?, sistema_destino_tipo = ?, sistema_destino_url = ?,
-            api_token = ?, auto_sync_enabled = ?, intervalo_segundos = ?,
+            api_token = ?, usuario_esus = ?, senha_esus = ?, token_sessao_esus = ?,
+            auto_sync_enabled = ?, intervalo_segundos = ?,
             politica_conflito = ?, simulador_sus_ativo = ?
           WHERE id = 1
         `).run(
-          data.sistema_origem_nome || 'UBS Central / Agenda Local',
+          data.sistema_origem_nome || 'UBS Imbuia / Agenda Local',
           data.sistema_destino_tipo || 'sus_pec',
-          data.sistema_destino_url || 'http://localhost:3000/api/mock-sus',
+          data.sistema_destino_url || 'https://esus.imbuia.sc.gov.br/agenda',
           data.api_token || '',
+          data.usuario_esus || '',
+          data.senha_esus || '',
+          data.token_sessao_esus || '',
           data.auto_sync_enabled ? 1 : 0,
           data.intervalo_segundos ? parseInt(data.intervalo_segundos, 10) : 60,
           data.politica_conflito || 'mais_recente',

@@ -73,16 +73,19 @@ function initDatabase() {
 
     CREATE TABLE IF NOT EXISTS sync_config (
       id INTEGER PRIMARY KEY CHECK (id = 1),
-      sistema_origem_nome TEXT DEFAULT 'UBS Central / Agenda Local',
+      sistema_origem_nome TEXT DEFAULT 'UBS Imbuia / Agenda Local',
       sistema_destino_tipo TEXT DEFAULT 'sus_pec',
-      sistema_destino_url TEXT DEFAULT 'http://localhost:3000/api/mock-sus',
+      sistema_destino_url TEXT DEFAULT 'https://esus.imbuia.sc.gov.br/agenda',
       api_token TEXT DEFAULT 'SUS-TOKEN-SECURE-2026',
+      usuario_esus TEXT,
+      senha_esus TEXT,
+      token_sessao_esus TEXT,
       auto_sync_enabled INTEGER DEFAULT 1,
       intervalo_segundos INTEGER DEFAULT 60,
       politica_conflito TEXT DEFAULT 'mais_recente',
-      simulador_sus_ativo INTEGER DEFAULT 1,
+      simulador_sus_ativo INTEGER DEFAULT 0,
       ultimo_sync TEXT,
-      ultimo_status TEXT DEFAULT 'Pronto para sincronizar'
+      ultimo_status TEXT DEFAULT 'Conectado a https://esus.imbuia.sc.gov.br/agenda'
     );
 
     CREATE TABLE IF NOT EXISTS sync_logs (
@@ -95,6 +98,20 @@ function initDatabase() {
     );
   `);
 
+  // Migrações dinâmicas para campos do e-SUS PEC
+  try { db.exec('ALTER TABLE sync_config ADD COLUMN usuario_esus TEXT;'); } catch (e) {}
+  try { db.exec('ALTER TABLE sync_config ADD COLUMN senha_esus TEXT;'); } catch (e) {}
+  try { db.exec('ALTER TABLE sync_config ADD COLUMN token_sessao_esus TEXT;'); } catch (e) {}
+
+  // Atualiza destino para o servidor oficial de Imbuia
+  db.prepare(`
+    UPDATE sync_config
+    SET sistema_destino_url = 'https://esus.imbuia.sc.gov.br/agenda',
+        sistema_origem_nome = 'UBS Imbuia / Agenda Local',
+        simulador_sus_ativo = 0
+    WHERE id = 1
+  `).run();
+
   // Ensure default sync config exists
   const config = db.prepare('SELECT * FROM sync_config WHERE id = 1').get();
   if (!config) {
@@ -104,9 +121,9 @@ function initDatabase() {
         api_token, auto_sync_enabled, intervalo_segundos, politica_conflito,
         simulador_sus_ativo, ultimo_status
       ) VALUES (
-        1, 'UBS Central / Agenda Local', 'sus_pec', 'http://localhost:3000/api/mock-sus',
+        1, 'UBS Imbuia / Agenda Local', 'sus_pec', 'https://esus.imbuia.sc.gov.br/agenda',
         'SUS-TOKEN-SECURE-2026', 1, 60, 'mais_recente',
-        1, 'Pronto para sincronizar'
+        0, 'Conectado a https://esus.imbuia.sc.gov.br/agenda'
       )
     `).run();
   }

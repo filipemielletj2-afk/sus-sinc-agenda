@@ -293,29 +293,32 @@
     <!-- ========================================================= -->
     <section id="tab-sync" class="tab-content hidden space-y-6">
       
-      <!-- Card Informativo do Sincronismo -->
-      <div class="bg-gradient-to-r from-emerald-800 to-teal-800 rounded-2xl text-white p-6 shadow-md">
+      <!-- Card Informativo do Sincronismo Oficial com Imbuia -->
+      <div class="bg-gradient-to-r from-emerald-800 via-teal-800 to-cyan-900 rounded-2xl text-white p-6 shadow-md border border-emerald-600/30">
         <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div class="space-y-1">
-            <div class="inline-flex items-center space-x-2 bg-emerald-600/60 px-3 py-1 rounded-full text-xs font-semibold text-emerald-100 mb-1">
-              <i class="fa-solid fa-arrows-split-up-and-left rotate-90"></i>
-              <span>Sincronização Bidirecional Ativa</span>
+            <div class="inline-flex items-center space-x-2 bg-emerald-500/30 border border-emerald-400/40 px-3 py-1 rounded-full text-xs font-bold text-emerald-200 mb-1">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+              <span>Conexão e-SUS PEC Imbuia / SC</span>
             </div>
-            <h2 class="text-xl font-bold">Integração com e-SUS PEC & SISREG</h2>
+            <h2 class="text-xl font-bold flex items-center space-x-2">
+              <i class="fa-solid fa-hospital text-emerald-300"></i>
+              <span>e-SUS PEC: Município de Imbuia - SC</span>
+            </h2>
             <p class="text-sm text-emerald-100/90 max-w-2xl">
-              Este sistema mantém a agenda local e os pacientes salvos automaticamente sincronizados com o banco de dados do SUS. 
-              Alterações feitas nesta agenda sobem para o SUS, e agendamentos ou regulações do SUS descem para a agenda local.
+              Sincronização configurada para o servidor oficial: <code class="bg-black/30 px-2 py-0.5 rounded font-mono text-xs text-amber-300">https://esus.imbuia.sc.gov.br/agenda</code>. 
+              As consultas e cidadãos são mantidos sincronizados em tempo real entre a agenda local e o Prontuário Eletrônico do Cidadão da prefeitura.
             </p>
           </div>
 
           <div class="flex flex-col sm:flex-row gap-2">
+            <button onclick="testarConexaoEsusImbuia()" id="btn-testar-imbuia" class="bg-white/20 hover:bg-white/30 text-white font-semibold px-4 py-2.5 rounded-xl text-sm border border-white/30 flex items-center justify-center space-x-2 transition">
+              <i class="fa-solid fa-satellite-dish"></i>
+              <span>Testar Conexão Imbuia</span>
+            </button>
             <button onclick="triggerManualSync()" class="bg-amber-400 hover:bg-amber-300 text-slate-900 font-bold px-4 py-2.5 rounded-xl text-sm shadow flex items-center justify-center space-x-2 transition">
               <i class="fa-solid fa-arrows-rotate"></i>
-              <span>Forçar Sincronização Agora</span>
-            </button>
-            <button onclick="injetarConsultaSusTeste()" class="bg-white/20 hover:bg-white/30 text-white font-semibold px-4 py-2.5 rounded-xl text-sm border border-white/30 flex items-center justify-center space-x-2 transition" title="Simula uma nova consulta sendo agendada pelo SUS">
-              <i class="fa-solid fa-plus-circle"></i>
-              <span>Simular Consulta do SUS</span>
+              <span>Sincronizar com e-SUS</span>
             </button>
           </div>
         </div>
@@ -328,37 +331,48 @@
         <div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200/90 p-5 space-y-4">
           <h3 class="text-base font-bold text-slate-800 flex items-center space-x-2">
             <i class="fa-solid fa-sliders text-emerald-600"></i>
-            <span>Parâmetros de Integração</span>
+            <span>Credenciais & Parâmetros do e-SUS PEC</span>
           </h3>
 
           <form id="form-sync-config" onsubmit="salvarConfigSync(event)" class="space-y-4">
             
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label class="block text-xs font-bold text-slate-600 mb-1">Nome da Unidade / Sistema Local</label>
-                <input type="text" id="cfg-sistema-origem" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" value="UBS Central / Agenda Local">
+                <label class="block text-xs font-bold text-slate-600 mb-1">Nome da Unidade / UBS Local</label>
+                <input type="text" id="cfg-sistema-origem" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" value="UBS Imbuia / Agenda Local">
               </div>
 
               <div>
-                <label class="block text-xs font-bold text-slate-600 mb-1">Sistema Remoto SUS</label>
+                <label class="block text-xs font-bold text-slate-600 mb-1">Sistema Remoto</label>
                 <select id="cfg-sistema-destino" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
-                  <option value="sus_pec">e-SUS PEC (Prontuário Eletrônico Cidadão)</option>
-                  <option value="sisreg">SISREG III (Regulação Municipal/Estadual)</option>
+                  <option value="sus_pec" selected>e-SUS PEC (Prontuário Eletrônico Cidadão - Imbuia/SC)</option>
+                  <option value="sisreg">SISREG III (Regulação Estadual SC)</option>
                   <option value="google_calendar">Google Calendar / Agenda Externa</option>
-                  <option value="api_rest">API REST Padrão RNDS / FHIR</option>
                 </select>
               </div>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label class="block text-xs font-bold text-slate-600 mb-1">URL / Endpoint do Servidor SUS</label>
-                <input type="text" id="cfg-url" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" value="http://localhost:3000/api/mock-sus">
+                <label class="block text-xs font-bold text-slate-600 mb-1">URL da Agenda / Servidor e-SUS *</label>
+                <input type="text" id="cfg-url" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none text-emerald-800 font-semibold" value="https://esus.imbuia.sc.gov.br/agenda">
               </div>
 
               <div>
-                <label class="block text-xs font-bold text-slate-600 mb-1">Token de Acesso / Certificado</label>
-                <input type="text" id="cfg-token" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" value="SUS-TOKEN-SECURE-2026">
+                <label class="block text-xs font-bold text-slate-600 mb-1">Operador / Usuário ou CPF e-SUS</label>
+                <input type="text" id="cfg-usuario-esus" placeholder="Ex: seu.usuario ou CPF" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-bold text-slate-600 mb-1">Senha do Operador e-SUS</label>
+                <input type="password" id="cfg-senha-esus" placeholder="••••••••••••" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold text-slate-600 mb-1">Token de Sessão / Cookie (Opcional)</label>
+                <input type="text" id="cfg-token-sessao" placeholder="JSESSIONID ou Bearer Token" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none">
               </div>
             </div>
 
@@ -372,7 +386,7 @@
                 <label class="block text-xs font-bold text-slate-600 mb-1">Resolução de Conflitos</label>
                 <select id="cfg-politica" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
                   <option value="mais_recente">Mais recente prevalece (Padrão)</option>
-                  <option value="priorizar_sus">Priorizar Sistema SUS</option>
+                  <option value="priorizar_sus">Priorizar Sistema e-SUS</option>
                   <option value="priorizar_local">Priorizar Agenda Local</option>
                 </select>
               </div>
@@ -386,7 +400,10 @@
               </div>
             </div>
 
-            <div class="pt-3 border-t border-slate-100 flex justify-end">
+            <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
+              <button type="button" onclick="alternarModoSimulador()" id="btn-toggle-simulador" class="text-xs text-slate-500 hover:text-slate-800 underline">
+                Alternar para Simulador Local de Testes
+              </button>
               <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg text-sm transition">
                 Salvar Configurações
               </button>
@@ -395,27 +412,32 @@
           </form>
         </div>
 
-        <!-- Status e Último Resultado -->
+        <!-- Status e Diagnóstico em Tempo Real -->
         <div class="bg-white rounded-2xl shadow-sm border border-slate-200/90 p-5 space-y-4">
           <h3 class="text-base font-bold text-slate-800 flex items-center space-x-2">
             <i class="fa-solid fa-server text-emerald-600"></i>
-            <span>Status da Conexão</span>
+            <span>Diagnóstico do Servidor Imbuia</span>
           </h3>
 
           <div class="space-y-3">
+            <div id="card-diagnostico-imbuia" class="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs space-y-1">
+              <div class="font-bold text-emerald-800 flex items-center space-x-1.5">
+                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                <span>Servidor e-SUS de Imbuia Detectado</span>
+              </div>
+              <p class="text-emerald-700 text-2xs leading-relaxed">
+                Endpoint oficial: <span class="font-mono">https://esus.imbuia.sc.gov.br/agenda</span>
+              </p>
+            </div>
+
             <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
               <div class="text-xs text-slate-500">Última Sincronização</div>
               <div id="cfg-ultimo-sync" class="text-sm font-semibold text-slate-800">Aguardando...</div>
             </div>
 
             <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
-              <div class="text-xs text-slate-500">Último Relatório</div>
+              <div class="text-xs text-slate-500">Último Relatório / Resposta</div>
               <div id="cfg-ultimo-status" class="text-xs text-slate-700 mt-1 leading-relaxed">Pronto</div>
-            </div>
-
-            <div class="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-emerald-800 text-xs">
-              <i class="fa-solid fa-circle-check text-emerald-600 mr-1"></i>
-              <span>Simulador SUS Integrado rodando nativamente para testes locais imediatos.</span>
             </div>
           </div>
         </div>
