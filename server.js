@@ -286,8 +286,14 @@ const server = http.createServer(async (req, res) => {
     if (method === 'POST') {
       try {
         const data = await parseRequestBody(req);
-        if (!data.paciente_nome || !data.data || !data.hora_inicio || !data.hora_fim) {
-          return sendJson(res, 400, { error: 'Preencha todos os campos obrigatórios da consulta (Paciente, Data e Horário).' });
+        const tipoAg = data.tipo_agendamento || 'consulta';
+
+        if (tipoAg !== 'reserva' && (!data.paciente_nome || !data.data || !data.hora_inicio || !data.hora_fim)) {
+          return sendJson(res, 400, { error: 'Preencha todos os campos obrigatórios da consulta (Cidadão, Data e Horário).' });
+        }
+
+        if (tipoAg === 'reserva' && (!data.data || !data.hora_inicio || !data.hora_fim)) {
+          return sendJson(res, 400, { error: 'Preencha Data e Horário da reserva.' });
         }
 
         // Conflito de horário para o mesmo profissional
@@ -300,7 +306,7 @@ const server = http.createServer(async (req, res) => {
 
           if (conflito) {
             return sendJson(res, 409, {
-              error: `Conflito de agenda: ${data.profissional_nome} já possui atendimento com ${conflito.paciente_nome} das ${conflito.hora_inicio} às ${conflito.hora_fim}.`
+              error: `Conflito de agenda: ${data.profissional_nome} já possui compromisso com ${conflito.paciente_nome} das ${conflito.hora_inicio} às ${conflito.hora_fim}.`
             });
           }
         }
@@ -308,41 +314,164 @@ const server = http.createServer(async (req, res) => {
         const now = new Date().toISOString();
         const uuid = data.uuid || crypto.randomUUID();
 
+        // Determina status de sincronização oficial do e-SUS PEC (Seção 4.1.4.1)
+        let syncPecStatus = 'Sincronizado';
+        if (!data.paciente_cns) {
+          syncPecStatus = 'Cidadão sem CNS cadastrado';
+        } else if (String(data.paciente_cns).startsWith('7')) {
+          syncPecStatus = 'Cidadão sem CNS definitivo';
+        }
+
+        const pacienteNomeFinal = tipoAg === 'reserva' 
+          ? `[RESERVA] ${data.motivo_reserva || 'Horário Reservado'}`
+          : (data.paciente_nome ? data.paciente_nome.trim() : 'Cidadão');
+
         const insert = db.prepare(`
           INSERT INTO agendamentos (
             uuid, paciente_id, paciente_nome, paciente_cns, profissional_id,
             profissional_nome, especialidade, sala, data, hora_inicio, hora_fim,
             tipo_atendimento, status, observacoes, origem, sync_id, sync_status,
+            tipo_agendamento, fora_ubs, local_fora_ubs, profissional_convidado_id,
+            profissional_convidado_nome, motivo_reserva, sync_pec_status,
             last_synced_at, updated_at, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_upload', null, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_upload', ?, ?, ?, ?, ?, ?, ?, null, ?, ?)
         `);
 
         const result = insert.run(
           uuid,
           data.paciente_id || null,
-          data.paciente_nome.trim(),
+          pacienteNomeFinal,
           data.paciente_cns ? data.paciente_cns.trim() : null,
           data.profissional_id || null,
-          data.profissional_nome ? data.profissional_nome.trim() : 'Clínico Geral',
+          data.profissional_nome ? data.profissional_nome.trim() : 'Profissional de Saúde',
           data.especialidade || 'Consulta Médica',
           data.sala || 'Consultório 1',
           data.data,
           data.hora_inicio,
           data.hora_fim,
-          data.tipo_atendimento || 'Consulta Eletiva',
-          data.status || 'Agendado',
+          data.tipo_atendimento || (tipoAg === 'reserva' ? 'Reserva de Horário' : 'Consulta no Consultório'),
+          tipoAg === 'reserva' ? 'Reservado' : (data.status || 'Agendado'),
           data.observacoes || null,
           data.origem || 'local',
           data.sync_id || null,
+          tipoAg,
+          data.fora_ubs ? 1 : 0,
+          data.local_fora_ubs || null,
+          data.profissional_convidado_id || null,
+          data.profissional_convidado_nome || null,
+          data.motivo_reserva || null,
+          syncPecStatus,
           now,
           now
         );
 
         const newAg = db.prepare('SELECT * FROM agendamentos WHERE id = ?').get(result.lastInsertRowid);
-        return sendJson(res, 201, { success: true, agendamento: newAg, message: 'Agendamento salvo e programado para sincronização com o SUS!' });
+        return sendJson(res, 201, { success: true, agendamento: newAg, message: 'Agendamento salvo no padrão e-SUS PEC!' });
       } catch (err) {
         return sendJson(res, 500, { error: err.message });
       }
+    }
+  }
+
+  // Ações Oficiais do Capítulo 4 do Manual e-SUS PEC
+  // 4.1.2 Adicionar Cidadão na Lista de Atendimentos
+  if (pathname.endsWith('/lista-atendimentos') && method === 'POST') {
+    const id = parseInt(pathname.split('/')[3], 10);
+    const now = new Date().toISOString();
+    db.prepare(`
+      UPDATE agendamentos
+      SET na_lista_atendimento = 1, status = 'Aguardando', data_hora_chegada_lista = ?, updated_at = ?
+      WHERE id = ?
+    `).run(now, now, id);
+    return sendJson(res, 200, { success: true, message: 'Cidadão adicionado à Lista de Atendimentos do dia com sucesso!' });
+  }
+
+  // 4.1.5 Cancelar agendamento
+  if (pathname.endsWith('/cancelar') && method === 'POST') {
+    const id = parseInt(pathname.split('/')[3], 10);
+    const body = await parseRequestBody(req);
+    const now = new Date().toISOString();
+    db.prepare(`
+      UPDATE agendamentos
+      SET status = 'Cancelado', justificativa_cancelamento = ?, sync_status = 'pending_upload', updated_at = ?
+      WHERE id = ?
+    `).run(body.justificativa || 'Cancelado pelo cidadão ou unidade', now, id);
+    return sendJson(res, 200, { success: true, message: 'Agendamento cancelado com justificativa registrada.' });
+  }
+
+  // 4.1.6 Informar que o Cidadão faltou
+  if (pathname.endsWith('/faltou') && method === 'POST') {
+    const id = parseInt(pathname.split('/')[3], 10);
+    const now = new Date().toISOString();
+    db.prepare(`
+      UPDATE agendamentos
+      SET status = 'Faltou', sync_status = 'pending_upload', updated_at = ?
+      WHERE id = ?
+    `).run(now, id);
+    return sendJson(res, 200, { success: true, message: 'Falta registrada no prontuário do cidadão.' });
+  }
+
+  // 4.8 Fixar profissional para acesso rápido na agenda
+  if (pathname.startsWith('/api/profissionais/') && pathname.endsWith('/fixar') && method === 'POST') {
+    const id = parseInt(pathname.split('/')[3], 10);
+    db.prepare('UPDATE profissionais SET fixado = 0').run();
+    db.prepare('UPDATE profissionais SET fixado = 1 WHERE id = ?').run(id);
+    return sendJson(res, 200, { success: true, message: 'Profissional fixado para acesso rápido na agenda!' });
+  }
+
+  // 4.1.7 Pesquisar por Cidadão na Agenda
+  if (pathname === '/api/pesquisa-cidadao-agenda' && method === 'GET') {
+    const q = (searchParams.get('q') || '').trim();
+    if (!q) return sendJson(res, 200, []);
+    const like = `%${q}%`;
+    const ags = db.prepare(`
+      SELECT * FROM agendamentos
+      WHERE paciente_nome LIKE ? OR paciente_cns LIKE ?
+      ORDER BY data DESC, hora_inicio ASC
+    `).all(like, like);
+    return sendJson(res, 200, ags);
+  }
+
+  // 4.6 Facilidades no agendamento de consultas de pré-natal
+  if (pathname === '/api/pre-natal/cronograma' && method === 'POST') {
+    try {
+      const data = await parseRequestBody(req);
+      const dumDate = data.dum ? new Date(data.dum) : new Date();
+      
+      // Cronograma sugerido conforme manual do Ministério da Saúde:
+      // Consultas mensais até 28ª semana (alternando Médico e Enfermeiro)
+      // Consultas quinzenais de 28 a 36 semanas
+      // Consultas semanais de 36 a 40 semanas
+      // Consultas odontológicas: 1 por trimestre
+      const cronograma = [];
+      const semanas = [8, 12, 16, 20, 24, 28, 30, 32, 34, 36, 37, 38, 39, 40];
+      
+      semanas.forEach((sem, idx) => {
+        const d = new Date(dumDate);
+        d.setDate(d.getDate() + sem * 7);
+        const isMedico = idx % 2 === 0;
+        cronograma.push({
+          semana_gestacional: `${sem}ª Semana`,
+          data_sugerida: d.toISOString().split('T')[0],
+          tipo_profissional: isMedico ? 'Médico(a) de Família' : 'Enfermeiro(a) Chefe',
+          cbo_sugerido: isMedico ? '2251-42 (Médico)' : '2235-05 (Enfermeiro)',
+          tipo_consulta: 'Consulta Pré-Natal'
+        });
+      });
+
+      // 3 consultas odontológicas (1º, 2º e 3º trimestre)
+      const dOdonto1 = new Date(dumDate); dOdonto1.setDate(dOdonto1.getDate() + 10 * 7);
+      const dOdonto2 = new Date(dumDate); dOdonto2.setDate(dOdonto2.getDate() + 22 * 7);
+      const dOdonto3 = new Date(dumDate); dOdonto3.setDate(dOdonto3.getDate() + 32 * 7);
+
+      cronograma.push({ semana_gestacional: '1º Trimestre', data_sugerida: dOdonto1.toISOString().split('T')[0], tipo_profissional: 'Cirurgião Dentista', cbo_sugerido: '2232-08 (Dentista)', tipo_consulta: 'Pré-Natal Odontológico' });
+      cronograma.push({ semana_gestacional: '2º Trimestre', data_sugerida: dOdonto2.toISOString().split('T')[0], tipo_profissional: 'Cirurgião Dentista', cbo_sugerido: '2232-08 (Dentista)', tipo_consulta: 'Pré-Natal Odontológico' });
+      cronograma.push({ semana_gestacional: '3º Trimestre', data_sugerida: dOdonto3.toISOString().split('T')[0], tipo_profissional: 'Cirurgião Dentista', cbo_sugerido: '2232-08 (Dentista)', tipo_consulta: 'Pré-Natal Odontológico' });
+
+      cronograma.sort((a, b) => a.data_sugerida.localeCompare(b.data_sugerida));
+      return sendJson(res, 200, { success: true, cronograma });
+    } catch (e) {
+      return sendJson(res, 500, { error: e.message });
     }
   }
 

@@ -103,6 +103,22 @@ function initDatabase() {
   try { db.exec('ALTER TABLE sync_config ADD COLUMN senha_esus TEXT;'); } catch (e) {}
   try { db.exec('ALTER TABLE sync_config ADD COLUMN token_sessao_esus TEXT;'); } catch (e) {}
 
+  // Migrações do Capítulo 4 do Manual e-SUS PEC (PEC_04_agenda)
+  try { db.exec("ALTER TABLE agendamentos ADD COLUMN tipo_agendamento TEXT DEFAULT 'consulta';"); } catch (e) {}
+  try { db.exec("ALTER TABLE agendamentos ADD COLUMN fora_ubs INTEGER DEFAULT 0;"); } catch (e) {}
+  try { db.exec("ALTER TABLE agendamentos ADD COLUMN local_fora_ubs TEXT;"); } catch (e) {}
+  try { db.exec("ALTER TABLE agendamentos ADD COLUMN profissional_convidado_id INTEGER;"); } catch (e) {}
+  try { db.exec("ALTER TABLE agendamentos ADD COLUMN profissional_convidado_nome TEXT;"); } catch (e) {}
+  try { db.exec("ALTER TABLE agendamentos ADD COLUMN motivo_reserva TEXT;"); } catch (e) {}
+  try { db.exec("ALTER TABLE agendamentos ADD COLUMN justificativa_cancelamento TEXT;"); } catch (e) {}
+  try { db.exec("ALTER TABLE agendamentos ADD COLUMN sync_pec_status TEXT DEFAULT 'Sincronizado';"); } catch (e) {}
+  try { db.exec("ALTER TABLE agendamentos ADD COLUMN na_lista_atendimento INTEGER DEFAULT 0;"); } catch (e) {}
+  try { db.exec("ALTER TABLE agendamentos ADD COLUMN data_hora_chegada_lista TEXT;"); } catch (e) {}
+
+  try { db.exec("ALTER TABLE profissionais ADD COLUMN cbo TEXT DEFAULT '2251-42';"); } catch (e) {}
+  try { db.exec("ALTER TABLE profissionais ADD COLUMN equipe_ine TEXT DEFAULT '0001234567';"); } catch (e) {}
+  try { db.exec("ALTER TABLE profissionais ADD COLUMN fixado INTEGER DEFAULT 0;"); } catch (e) {}
+
   // Atualiza destino para o servidor oficial de Imbuia
   db.prepare(`
     UPDATE sync_config

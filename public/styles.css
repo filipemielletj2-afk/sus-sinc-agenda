@@ -1,4 +1,4 @@
-/* Custom SUS Sinc Styles */
+/* Custom SUS Sinc Styles - Padrão e-SUS PEC (Capítulo 4) */
 
 @keyframes scaleIn {
   from {
@@ -84,31 +84,31 @@
   border: 1px solid #e2e8f0;
 }
 
-/* Sync Origin Badges */
-.badge-origem-local {
-  background-color: #f1f5f9;
-  color: #475569;
-  border: 1px solid #e2e8f0;
+.badge-reservado {
+  background-color: #fffbeb;
+  color: #92400e;
+  border: 1px solid #fcd34d;
 }
 
-.badge-origem-sus {
-  background-color: #ecfdf5;
-  color: #065f46;
-  border: 1px solid #6ee7b7;
-}
-
-/* Pulsing sync dot */
-@keyframes pulseDot {
-  0%, 100% {
-    transform: scale(1);
-    opacity: 1;
+/* Print styles for Comprovante e Agenda (Seções 4.3 e 4.4) */
+@media print {
+  body * {
+    visibility: hidden;
   }
-  50% {
-    transform: scale(1.4);
-    opacity: 0.5;
+  #comprovante-print-area, #comprovante-print-area * {
+    visibility: visible;
   }
-}
+  #comprovante-print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 20px;
+    border: none !important;
+  }
 
-.animate-pulse-dot {
-  animation: pulseDot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  .print-area-agenda, .print-area-agenda * {
+    visibility: visible;
+  }
 }
